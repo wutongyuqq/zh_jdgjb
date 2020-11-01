@@ -125,8 +125,27 @@ if($res['return_code'] == 'SUCCESS' && $res['result_code'] == 'SUCCESS' ){
 
 	}
 
-	if($czorder['state']==1){
-		pdo_update('zh_jdgjb_recharge',array('state'=>2),array('out_trade_no'=>$logno));
+	if($czorder['state']==1) {
+		pdo_update('zh_jdgjb_recharge', array('state' => 2), array('out_trade_no' => $logno));
+		$order = pdo_get('zh_jdgjb_recharge', array('out_trade_no' => $logno));
+		if ($order) {
+
+		$orderTk = pdo_get('cjdc_qbmx', array('order_id' => $order['id']));
+			if($orderTk){
+				pdo_update('cjdc_qbmx', array('state' => 2), array('order_id' => $logno));
+			}else {
+				$tk['money'] = $order['cz_money'];
+				$tk['order_id'] = $order['id'];
+				$tk['user_id'] = $order['user_id'];
+				$tk['type'] = 1;
+				$tk['state'] = 2;
+				$tk['note'] = $order['note'];
+				$tk['isFromJd'] = 1;
+				$tk['time'] = date('Y-m-d H:i:s');
+				$tkres = pdo_insert('cjdc_qbmx', $tk);
+			}
+		}
+
 		pdo_update('cjdc_user',array('wallet +='=>$czorder['cz_money']+$czorder['zs_money']),array('id'=>$czorder['user_id']));
 			//佣金计算
 	$set=pdo_get('zh_jdgjb_fxset',array('uniacid'=>$czorder['uniacid']));

@@ -813,6 +813,17 @@ public function saveRecharge($order_id){
     $data['time']=time();
     $data['uniacid']=$_W['uniacid'];
     $res=pdo_insert('zh_jdgjb_recharge',$data);
+
+    $tk['money'] =  $orderInfo['total_cost'];
+    $tk['order_id'] = $order_id;
+    $tk['user_id'] = $orderInfo['user_id'];
+    $tk['type'] = 2;
+    $tk['state'] = 2;
+    $tk['note'] =  '订单退款';
+    $tk['time'] = date('Y-m-d H:i:s');
+    pdo_insert('cjdc_qbmx', $tk);
+
+
     if($res){
         return'1';
     }else{

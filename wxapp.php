@@ -65,16 +65,14 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
     public function doPageLogin() {
         global $_GPC, $_W;
         $openid = $_GPC['openid'];
-        $res = pdo_get('cjdc_user', array('openid' => $openid, 'uniacid' => $_W['uniacid']));
+        $res = pdo_get('cjdc_user', array('openid' => $openid));
         if ($res) {
             $user_id = $res['id'];
             $data['openid'] = $_GPC['openid'];
-            $data['img'] = $_GPC['img'];
-            $data['name'] = $_GPC['name'];
             $data['uniacid'] = $_W['uniacid'];
             $res = pdo_update('cjdc_user', $data, array('id' => $user_id));
-            $sql = "select a.*,b.name as level_name,b.discount  from " . tablename("cjdc_user") . " a left join" . tablename('zh_jdgjb_level') . " b on a.level_id=b.id WHERE  a.openid=:openid and a.uniacid=:uniacid";
-            $user = pdo_fetch($sql, array(':openid' => $openid, 'uniacid' => $_W['uniacid']));
+            $sql = "select a.*,b.name as level_name,b.discount  from " . tablename("cjdc_user") . " a left join" . tablename('zh_jdgjb_level') . " b on a.level_id=b.id WHERE  a.openid=:openid";
+            $user = pdo_fetch($sql, array(':openid' => $openid));
             if (empty($user['level_name'])) {
                 $user['level_name'] = '初始会员';
             }
@@ -88,30 +86,12 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
             $data['join_time'] = time();
             $data['type'] = 1;
             $res2 = pdo_insert('cjdc_user', $data);
-            $sql = "select a.*,b.name as level_name,b.discount  from " . tablename("cjdc_user") . " a left join" . tablename('zh_jdgjb_level') . " b on a.level_id=b.id WHERE  a.openid=:openid and a.uniacid=:uniacid";
-            $user = pdo_fetch($sql, array(':openid' => $openid, 'uniacid' => $_W['uniacid']));
+            $sql = "select a.*,b.name as level_name,b.discount  from " . tablename("cjdc_user") . " a left join" . tablename('zh_jdgjb_level') . " b on a.level_id=b.id WHERE  a.openid=:openid";
+            $user = pdo_fetch($sql, array(':openid' => $openid));
             if (empty($user['level_name'])) {
                 $user['level_name'] = '初始会员';
             }
 
-
-
-            $res3 = pdo_get('cjdc_user',array('id'=>$res['id']));
-            //更新外卖余额
-            $int = pdo_update('cjdc_user',array('wallet'=>$res3['wallet']),array('user_tel'=>$res3['tel']));
-
-            //更新商城余额
-            $int2 = pdo_update('ewei_shop_member',array('credit2'=>$res3['balance']),array('mobile'=>$res3['tel']));
-            if(bccomp($res3['wallet'],$int['wallet'],2) == -1){
-                echo "余额不一样";
-                die;
-            }
-
-
-            if(bccomp($res3['balance'],$int2['credit2'],2) == -1){
-                echo "余额不一样";
-                die;
-            }
             echo json_encode($user);
         }
 
@@ -665,6 +645,16 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $data['uniacid'] = $_W['uniacid'];
         $res = pdo_insert('zh_jdgjb_recharge', $data);
 
+        $tk['money'] =  $orderInfo['total_cost'];
+        $tk['order_id'] = $_GPC['order_id'];
+        $tk['user_id'] = $orderInfo['user_id'];
+        $tk['type'] = 1;
+        $tk['state'] = 2;
+        $tk['note'] =  '订单消费';
+        $tk['time'] = date('Y-m-d H:i:s');
+        pdo_insert('cjdc_qbmx', $tk);
+
+
         if ($res) {
             $dt_start = strtotime(substr($orderInfo['arrival_time'], 0, 10));
             $dt_end = strtotime(substr($orderInfo['departure_time'], 0, 10));
@@ -1067,12 +1057,15 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $data['time'] = time();
         $data['uniacid'] = $_W['uniacid'];
         $res = pdo_insert('zh_jdgjb_recharge', $data);
+
         $data2['money']= $orderInfo['total_cost'];
         $data2['order_id']= $orderInfo['order_id'];
         $data2['type']= 2;
+        $data2['state']= 2;
         $data2['note']= "订单退款";
         $data2['user_id']= $orderInfo['user_id'];
         $res2 = pdo_insert('cjdc_qbmx', $data);
+
         if ($res) {
             pdo_update('zh_jdgjb_order', array('status' => 7), array('id' => $_GPC['order_id']));
             pdo_update('cjdc_user', array('wallet +=' => $orderInfo['total_cost']), array('id' => $orderInfo['user_id']));
@@ -1313,7 +1306,7 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
     }
 
 
-       //当面付订单明细
+    //当面付订单明细
     public function doPageFaceToFace() {
         global $_W, $_GPC;
         $selectDate = $_GPC['selectDate'];
@@ -2087,12 +2080,17 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $weixinpay = new WeixinPay($appid, $openid, $mch_id, $key, $out_trade_no, $body, $total_fee, $root);
         $return = $weixinpay->pay();
 
-        $res3 = pdo_get('cjdc_user',array('openid'=>$openid));
-        //更新外卖余额
-        pdo_update('cjdc_user',array('wallet'=>$res3['wallet']),array('user_tel'=>$res3['tel']));
-        //更新商城余额
-        pdo_update('ewei_shop_member',array('credit2'=>$res3['wallet']),array('mobile'=>$res3['tel']));
-
+     /*   $res3 = pdo_get('cjdc_user',array('openid'=>$openid));
+*/
+        $tk['money'] =  $order['cz_money'];
+        $tk['order_id'] = $_GPC['cz_id'];
+        $tk['user_id'] = $order['user_id'];
+        $tk['type'] = 1;
+        $tk['state'] = 1;
+        $tk['note'] =  '会员余额充值';
+        $tk['isFromJd'] =  1;
+        $tk['time'] = date('Y-m-d H:i:s');
+        $tkres = pdo_insert('cjdc_qbmx', $tk);
         echo json_encode($return);
     }
 
@@ -2108,24 +2106,13 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $data['time'] = time();
         $data['uniacid'] = $_W['uniacid'];
         $res2 = pdo_insert('zh_jdgjb_recharge', $data);
-
-
         $cz_id = pdo_insertid();
         //酒店余额
-
         if ($res2) {
             echo $cz_id;
-
-
-
         } else {
-
             echo '2';
-
         }
-
-
-
     }
 
 //余额明细
