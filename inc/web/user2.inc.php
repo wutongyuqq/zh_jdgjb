@@ -72,6 +72,7 @@ if(checksubmit('submit3')){
 				$data['user_id']=$_GPC['id3'];
 				$data['type']=2;
 				$data['note']='后台扣减';
+				$data['isFromJd'] = 1;
 				$data['time']=date('Y-m-d H:i:s');
 				$res2=pdo_insert('cjdc_qbmx',$data);
 				message('扣减成功！此次扣减金额为：￥'.$_GPC['reply']."元", $this->createWebUrl('user2'), 'success');

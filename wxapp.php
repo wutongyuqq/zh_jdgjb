@@ -352,10 +352,10 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         global $_W, $_GPC;
         // $res = pdo_update('cjdc_user', array('tel=' => $_GET['tel']), array('id' => $_GPC['user_id']));
         //$res = pdo_update('cjdc_user', array('tel=' => $_GET['tel']), array('id' => $_GET['user_id']));
-
-        $sql = " UPDATE ims_zh_jdgjb_user SET tel='".$_GET['tel']."' WHERE id=". $_GET['user_id'];
-
-        $res = pdo_query($sql, null);
+        $res = 0;
+        if($_GET['tel']){
+            $res =  pdo_update('cjdc_user', array('user_tel' => $_GET['tel']), array('id' => $_GPC['user_id']));
+        }
 
         echo $res;
     }
@@ -449,6 +449,26 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
     }
 
 
+    //获取手机号开关
+
+    public function doPageIsForceGetName()
+    {
+        global $_GPC, $_W;
+
+        $data['user_id'] = $_GPC['user_id'];
+        if($data['user_id']) {
+            $res1 = pdo_get("cjdc_user", array('id' => $_GPC['user_id']));
+            if($res1["name"]){
+                echo 0;
+            }else{
+                //强制为 1，不强制为0
+                echo 0;
+            }
+        }else {
+            echo 0;
+        }
+    }
+
 
 //房间详情
 
@@ -457,6 +477,25 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $res = pdo_get("zh_jdgjb_room", array('id' => $_GPC['room_id']));
         echo json_encode($res);
     }
+
+
+
+
+    //房间价格详情
+
+    public function doPageRoomPriceDetails() {
+        global $_GPC, $_W;
+        $res = pdo_get("zh_jdgjb_room", array('id' => $_GPC['room_id']));
+        $nomalPrice = $res['price'];
+        //select * from ims_cjdc_hotel_date a left join ims_cjdc_hotel_date_price b on a.id=b.dateId
+        $select_sql = "select * from ims_cjdc_hotel_date a left join (select * from ims_cjdc_hotel_date_price where pid=". $_GPC['room_id'].") b on a.id=b.dateId";
+        $list = pdo_fetchall($select_sql);
+
+
+        echo json_encode($res);
+    }
+
+
 
 //平台(所有)优惠券
 
@@ -653,6 +692,7 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $tk['note'] =  '订单消费';
         $tk['time'] = date('Y-m-d H:i:s');
         pdo_insert('cjdc_qbmx', $tk);
+
 
 
         if ($res) {
@@ -1062,6 +1102,7 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $data2['order_id']= $orderInfo['order_id'];
         $data2['type']= 2;
         $data2['state']= 2;
+        $data2['isFromJd']=1;
         $data2['note']= "订单退款";
         $data2['user_id']= $orderInfo['user_id'];
         $res2 = pdo_insert('cjdc_qbmx', $data);
@@ -1324,11 +1365,28 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         global $_W, $_GPC;
         $selectDate = $_GPC['selectDate'];
         $pageindex = max(1, intval($_GPC['page']));
-        $pagesize = 10;
-        $sql = "select a.*,b.name,b.img from (select * from ims_cjdc_qbmx where time like '".$selectDate."%') a LEFT join ims_cjdc_user b on a.user_id = b.id order by time desc";
+        $pagesize = 20;
+        $sql = "select a.time,a.money,a.note,a.type,b.name,b.img from (select * from ims_cjdc_qbmx where time like '".$selectDate."%' and isFromJd=0 and order_id=0 and note!='当面付订单') a LEFT join ims_cjdc_user b on a.user_id = b.id order by time desc";
         $select_sql = $sql . " LIMIT " . ($pageindex - 1) * $pagesize . "," . $pagesize;
+
+        $dateLongS = strtotime($selectDate);
+        $dateLongE = strtotime($selectDate)+86400;
+
+        $sql2 = "select from_unixtime(a.time) as time,a.state as type,a.cz_money as money,a.note,b.name,b.img from (select * from ims_zh_jdgjb_recharge where  note!='当面付订单' and state=2 and time>".$dateLongS." and time < ".$dateLongE.") a LEFT join ims_cjdc_user b on a.user_id = b.id order by a.time desc";
+
+                //select a.time,a.cz_money as money,a.note,b.name,b.img from (select * from ims_zh_jdgjb_recharge where note!='当面付订单' and state=2 and time>1604361600 and time < 1604448000) a LEFT join ims_cjdc_user b on a.user_id = b.id order by time desc
+        $select_sql2 = $sql2 . " LIMIT " . ($pageindex - 1) * $pagesize . "," . $pagesize;
         $list = pdo_fetchall($select_sql);
-        echo json_encode($list);
+        $list2 = pdo_fetchall($select_sql2);
+
+        $resList = array();
+        for($i=0;$i<count($list);$i++){
+            array_push($resList,$list[$i]);
+        }
+        for($i=0;$i<count($list2);$i++){
+            array_push($resList,$list2[$i]);
+        }
+        echo json_encode($resList);
     }
 
 
@@ -2080,8 +2138,8 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $weixinpay = new WeixinPay($appid, $openid, $mch_id, $key, $out_trade_no, $body, $total_fee, $root);
         $return = $weixinpay->pay();
 
-     /*   $res3 = pdo_get('cjdc_user',array('openid'=>$openid));
-*/
+        /*   $res3 = pdo_get('cjdc_user',array('openid'=>$openid));
+   */
         $tk['money'] =  $order['cz_money'];
         $tk['order_id'] = $_GPC['cz_id'];
         $tk['user_id'] = $order['user_id'];
@@ -2093,6 +2151,18 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $tkres = pdo_insert('cjdc_qbmx', $tk);
         echo json_encode($return);
     }
+
+
+    //更新信息
+    public function doPageUpdateUserInfo() {
+        global $_W, $_GPC;
+        $name = $_GPC['name'];
+        $user_tel = $_GPC['user_tel'];
+        pdo_update('cjdc_user', array('name' => $name,'user_tel' => $user_tel), array('id' => $_GPC['user_id']));
+        $res = pdo_get('cjdc_user', array('id' => $_GPC['user_id']));
+        echo json_encode($res);
+    }
+
 
 //充值
     public function doPageSaveRecharge() {
@@ -2121,19 +2191,22 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
         $pageindex = max(1, intval($_GPC['page']));
         $pagesize = 30;
         $data[':user_id'] = $_GPC['user_id'];
-        $sql = "  select id,cz_money,note,time from " . tablename('zh_jdgjb_recharge') . " where user_id=:user_id and state=2 ";
+        $sql = "  select id,cz_money,note,from_unixtime(time) as time from " . tablename('zh_jdgjb_recharge') . " where user_id=:user_id and state=2  order by time desc";
         $select_sql = $sql . " LIMIT " . ($pageindex - 1) * $pagesize . "," . $pagesize;
-        $list = pdo_fetchall($sql, $data);
+        $list = pdo_fetchall($select_sql, $data);
 
-        $sql2 = "  select id,money as cz_money,note,time from " . tablename('cjdc_qbmx') . " where user_id=:user_id and type=1 ";
-        $list2 = pdo_fetchall($sql2, $data);
-
-        if($list2){
-            echo json_encode($list+$list2);
-        }else {
-            echo json_encode($list);
+        $sql2 = "  select id,money as cz_money,note,time from " . tablename('cjdc_qbmx') . " where user_id=:user_id and isFromJd=0 and order_id=0  order by time desc";
+        $select_sql2 = $sql2 . " LIMIT " . ($pageindex - 1) * $pagesize . "," . $pagesize;
+        //select a.time,a.money,a.note,a.type,b.name,b.img from (select * from ims_cjdc_qbmx where time like '".$selectDate."%' and isFromJd=0 and order_id=0 and note!='当面付订单') a LEFT join ims_cjdc_user b on a.user_id = b.id order by time desc
+        $list2 = pdo_fetchall($select_sql2, $data);
+        $resList = array();
+        for($i=0;$i<count($list);$i++){
+            array_push($resList,$list[$i]);
         }
-
+        for($i=0;$i<count($list2);$i++){
+            array_push($resList,$list2[$i]);
+        }
+        echo json_encode($resList);
     }
 
 //入住改变
@@ -2170,7 +2243,6 @@ class Zh_jdgjbModuleWxapp extends WeModuleWxapp {
             $data['uniacid'] = $_W['uniacid'];
             $rst = pdo_insert('zh_jdgjb_score', $data);
             return $rst;
-
         }
         function roomNum($order_id) {
             global $_W, $_GPC;
